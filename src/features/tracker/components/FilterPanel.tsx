@@ -1,7 +1,7 @@
 /**
  * Dexpert Flow — Filter Panel
  *
- * Glassmorphism floating panel with medium, tenant, and status filters.
+ * Glassmorphic floating control panel matching IMAGE B.
  */
 
 'use client';
@@ -9,7 +9,6 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { Plane, Ship, Truck, ChevronDown, Search, X } from 'lucide-react';
 import { Medium, Status, TrackerFilters, Tenant } from '../types';
-import { MEDIUM_COLORS, STATUS_COLORS } from '../constants';
 
 interface FilterPanelProps {
   filters: TrackerFilters;
@@ -18,12 +17,6 @@ interface FilterPanelProps {
   totalCount: number;
   filteredCount: number;
 }
-
-const MEDIUM_CONFIG: { key: Medium; label: string; Icon: typeof Plane }[] = [
-  { key: 'air', label: 'Air', Icon: Plane },
-  { key: 'sea', label: 'Sea', Icon: Ship },
-  { key: 'road', label: 'Road', Icon: Truck },
-];
 
 export default function FilterPanel({
   filters,
@@ -37,7 +30,7 @@ export default function FilterPanel({
   const [collapsed, setCollapsed] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  /* ── Close dropdown on outside click ──────────────────────── */
+  /* Close dropdown on outside click */
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
@@ -48,7 +41,16 @@ export default function FilterPanel({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  /* ── Handlers ─────────────────────────────────────────────── */
+  /* Master medium toggle: if all 3 are on, turn off; otherwise turn all on */
+  const allMediumsActive = filters.mediums.size === 3;
+  const toggleAllMediums = () => {
+    if (allMediumsActive) {
+      onFiltersChange({ ...filters, mediums: new Set() });
+    } else {
+      onFiltersChange({ ...filters, mediums: new Set<Medium>(['air', 'sea', 'road']) });
+    }
+  };
+
   const toggleMedium = (m: Medium) => {
     const next = new Set(filters.mediums);
     if (next.has(m)) {
@@ -62,11 +64,8 @@ export default function FilterPanel({
   const toggleTenant = (id: string) => {
     const next = new Set(filters.tenantIds);
     if (id === '__all__') {
-      // Toggle all
       if (next.size === tenants.length) {
         next.clear();
-        // Keep at least all selected
-        tenants.forEach((t) => next.add(t.id));
       } else {
         tenants.forEach((t) => next.add(t.id));
       }
@@ -96,31 +95,32 @@ export default function FilterPanel({
 
   const allTenantsSelected = filters.tenantIds.size === tenants.length;
 
-  /* ── Mobile collapse ──────────────────────────────────────── */
+  const isDelayedOrExceptionActive = filters.statuses.has('delayed') || filters.statuses.has('exception');
+
   if (collapsed) {
     return (
       <button
         onClick={() => setCollapsed(false)}
-        className="fixed top-4 left-4 z-50 p-3 rounded-2xl bg-gray-900/80 backdrop-blur-xl border border-white/10 shadow-2xl text-white hover:bg-gray-800/80 transition-colors md:hidden"
+        className="fixed top-5 left-5 z-50 p-3 glass-panel text-white hover:bg-white/10 transition-colors md:hidden"
         aria-label="Open filters"
       >
-        <Search className="w-5 h-5" />
+        <Search className="w-5 h-5 text-cyan-400" />
       </button>
     );
   }
 
   return (
-    <div className="fixed top-4 left-4 z-50 w-72 rounded-2xl bg-gray-900/80 backdrop-blur-xl border border-white/10 shadow-2xl text-white">
-      {/* Header */}
+    <div className="fixed top-5 left-5 z-50 w-[270px] glass-panel text-white shadow-[0_25px_60px_rgba(0,0,0,0.6)] select-none">
+      {/* Title Header */}
       <div className="p-4 pb-3">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-lg font-bold tracking-tight">Dexpert Flow</h1>
-            <p className="text-[11px] text-gray-400 mt-0.5">Live 3D Global Cargo Tracker</p>
+            <h1 className="text-[17px] font-bold tracking-tight text-white">Dexpert Flow</h1>
+            <p className="text-[11px] text-slate-300 font-normal mt-0.5">Live 3D Global Cargo Tracker</p>
           </div>
           <button
             onClick={() => setCollapsed(true)}
-            className="p-1 rounded-lg hover:bg-white/10 transition-colors md:hidden"
+            className="p-1 rounded-lg hover:bg-white/10 text-slate-400 hover:text-white transition-colors md:hidden"
             aria-label="Collapse filters"
           >
             <X className="w-4 h-4" />
@@ -128,99 +128,110 @@ export default function FilterPanel({
         </div>
       </div>
 
-      {/* Medium Toggles */}
-      <div className="px-4 pb-3">
-        <p className="text-[11px] text-gray-400 uppercase tracking-wider mb-2 font-medium">Medium</p>
-        <div className="flex gap-2">
-          {MEDIUM_CONFIG.map(({ key, label, Icon }) => {
-            const active = filters.mediums.has(key);
-            const color = MEDIUM_COLORS[key];
-            return (
-              <button
-                key={key}
-                onClick={() => toggleMedium(key)}
-                className={`
-                  flex-1 flex flex-col items-center gap-1 py-2 px-2 rounded-xl text-xs font-medium
-                  transition-all duration-200 border
-                  ${active
-                    ? 'border-white/20 shadow-lg'
-                    : 'border-transparent bg-white/5 opacity-50 hover:opacity-80'}
-                `}
-                style={active ? {
-                  backgroundColor: `${color.hex}20`,
-                  borderColor: `${color.hex}40`,
-                  color: color.hex,
-                  boxShadow: `0 0 20px ${color.hex}15`,
-                } : undefined}
-                aria-label={`Toggle ${label}`}
-                aria-pressed={active}
-              >
-                <Icon className="w-4 h-4" />
-                <span>{label}</span>
-              </button>
-            );
-          })}
-        </div>
+      {/* Medium Section Header with Master Switch */}
+      <div className="px-4 pb-2 flex items-center justify-between">
+        <span className="text-[12px] font-semibold text-slate-200">Medium</span>
+        {/* Master Switch */}
+        <button
+          type="button"
+          onClick={toggleAllMediums}
+          className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full transition-colors duration-200 ease-in-out focus:outline-none ${
+            allMediumsActive ? 'bg-emerald-400' : 'bg-slate-700'
+          }`}
+          role="switch"
+          aria-checked={allMediumsActive}
+        >
+          <span
+            className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out mt-0.5 ml-0.5 ${
+              allMediumsActive ? 'translate-x-4' : 'translate-x-0'
+            }`}
+          />
+        </button>
       </div>
 
-      {/* Tenant Dropdown */}
+      {/* Medium 3 Tiles */}
+      <div className="px-4 pb-3 grid grid-cols-3 gap-2">
+        {/* Air Tile */}
+        <button
+          onClick={() => toggleMedium('air')}
+          className={`flex flex-col items-center justify-center py-2.5 px-1 rounded-xl transition-all duration-200 border cursor-pointer ${
+            filters.mediums.has('air')
+              ? 'border-cyan-400/60 bg-cyan-500/20 text-cyan-300 shadow-[0_0_15px_rgba(34,211,238,0.25)]'
+              : 'border-white/5 bg-white/5 text-slate-400 hover:border-white/15 hover:text-slate-200'
+          }`}
+        >
+          <Plane className="w-5 h-5 mb-1" />
+          <span className="text-[11px] font-medium">Air</span>
+        </button>
+
+        {/* Sea Tile */}
+        <button
+          onClick={() => toggleMedium('sea')}
+          className={`flex flex-col items-center justify-center py-2.5 px-1 rounded-xl transition-all duration-200 border cursor-pointer ${
+            filters.mediums.has('sea')
+              ? 'border-teal-400/60 bg-teal-500/20 text-teal-300 shadow-[0_0_15px_rgba(20,184,166,0.25)]'
+              : 'border-white/5 bg-white/5 text-slate-400 hover:border-white/15 hover:text-slate-200'
+          }`}
+        >
+          <Ship className="w-5 h-5 mb-1" />
+          <span className="text-[11px] font-medium">Sea</span>
+        </button>
+
+        {/* Road Tile */}
+        <button
+          onClick={() => toggleMedium('road')}
+          className={`flex flex-col items-center justify-center py-2.5 px-1 rounded-xl transition-all duration-200 border cursor-pointer ${
+            filters.mediums.has('road')
+              ? 'border-amber-400/60 bg-amber-500/20 text-amber-300 shadow-[0_0_15px_rgba(245,158,11,0.25)]'
+              : 'border-white/5 bg-white/5 text-slate-400 hover:border-white/15 hover:text-slate-200'
+          }`}
+        >
+          <Truck className="w-5 h-5 mb-1" />
+          <span className="text-[11px] font-medium">Road</span>
+        </button>
+      </div>
+
+      {/* Companies / Tenants Dropdown */}
       <div className="px-4 pb-3" ref={dropdownRef}>
-        <p className="text-[11px] text-gray-400 uppercase tracking-wider mb-2 font-medium">Companies / Tenants</p>
         <div className="relative">
           <button
             onClick={() => setTenantDropdownOpen(!tenantDropdownOpen)}
-            className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-sm hover:bg-white/10 transition-colors"
+            className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-slate-800/60 border border-white/10 text-xs text-slate-200 hover:border-white/20 transition-colors cursor-pointer"
             aria-expanded={tenantDropdownOpen}
-            aria-haspopup="listbox"
           >
-            <span className="text-gray-300 truncate">
+            <span className="truncate">
               {allTenantsSelected
-                ? 'All Companies'
-                : `${filters.tenantIds.size} selected`}
+                ? 'Companies / Tenants'
+                : `${filters.tenantIds.size} company selected`}
             </span>
             <ChevronDown
-              className={`w-4 h-4 text-gray-400 transition-transform ${
+              className={`w-3.5 h-3.5 text-slate-400 transition-transform ${
                 tenantDropdownOpen ? 'rotate-180' : ''
               }`}
             />
           </button>
+
           {tenantDropdownOpen && (
-            <div className="absolute top-full mt-1 left-0 right-0 bg-gray-900/95 backdrop-blur-xl border border-white/10 rounded-xl shadow-2xl overflow-hidden z-50">
-              <div className="p-2">
-                <div className="relative">
-                  <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
-                  <input
-                    type="text"
-                    value={tenantSearch}
-                    onChange={(e) => setTenantSearch(e.target.value)}
-                    placeholder="Search..."
-                    className="w-full pl-7 pr-3 py-1.5 text-sm bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-white/20"
-                    aria-label="Search tenants"
-                  />
-                </div>
+            <div className="absolute top-full mt-1.5 left-0 right-0 glass-panel bg-slate-900/95 border border-white/15 rounded-xl shadow-2xl overflow-hidden z-50 p-1.5">
+              <div className="relative mb-1">
+                <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400" />
+                <input
+                  type="text"
+                  value={tenantSearch}
+                  onChange={(e) => setTenantSearch(e.target.value)}
+                  placeholder="Filter company..."
+                  className="w-full pl-6 pr-2 py-1 text-xs bg-white/5 border border-white/10 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400/40"
+                />
               </div>
-              <div className="max-h-40 overflow-y-auto px-1 pb-1" role="listbox" aria-label="Tenants">
-                {/* All option */}
+              <div className="max-h-36 overflow-y-auto space-y-0.5">
                 <button
                   onClick={() => toggleTenant('__all__')}
-                  className="w-full flex items-center gap-2 px-3 py-1.5 text-sm rounded-lg hover:bg-white/10 transition-colors"
-                  role="option"
-                  aria-selected={allTenantsSelected}
+                  className="w-full flex items-center gap-2 px-2 py-1 text-xs rounded-lg hover:bg-white/10 text-slate-200 transition-colors text-left"
                 >
-                  <div
-                    className={`w-3.5 h-3.5 rounded border flex items-center justify-center ${
-                      allTenantsSelected
-                        ? 'bg-cyan-500 border-cyan-400'
-                        : 'border-gray-500'
-                    }`}
-                  >
-                    {allTenantsSelected && (
-                      <svg className="w-2.5 h-2.5 text-white" viewBox="0 0 12 12" fill="none">
-                        <path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                      </svg>
-                    )}
-                  </div>
-                  <span className="text-gray-200 font-medium">All</span>
+                  <span className={`w-3 h-3 rounded flex items-center justify-center border ${allTenantsSelected ? 'bg-cyan-500 border-cyan-400' : 'border-slate-500'}`}>
+                    {allTenantsSelected && <span className="text-[9px] text-white">✓</span>}
+                  </span>
+                  <span>All Companies</span>
                 </button>
                 {filteredTenants.map((t) => {
                   const checked = filters.tenantIds.has(t.id);
@@ -228,22 +239,12 @@ export default function FilterPanel({
                     <button
                       key={t.id}
                       onClick={() => toggleTenant(t.id)}
-                      className="w-full flex items-center gap-2 px-3 py-1.5 text-sm rounded-lg hover:bg-white/10 transition-colors"
-                      role="option"
-                      aria-selected={checked}
+                      className="w-full flex items-center gap-2 px-2 py-1 text-xs rounded-lg hover:bg-white/10 text-slate-300 transition-colors text-left"
                     >
-                      <div
-                        className={`w-3.5 h-3.5 rounded border flex items-center justify-center ${
-                          checked ? 'bg-cyan-500 border-cyan-400' : 'border-gray-500'
-                        }`}
-                      >
-                        {checked && (
-                          <svg className="w-2.5 h-2.5 text-white" viewBox="0 0 12 12" fill="none">
-                            <path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                          </svg>
-                        )}
-                      </div>
-                      <span className="text-gray-300">{t.name}</span>
+                      <span className={`w-3 h-3 rounded flex items-center justify-center border ${checked ? 'bg-cyan-500 border-cyan-400' : 'border-slate-500'}`}>
+                        {checked && <span className="text-[9px] text-white">✓</span>}
+                      </span>
+                      <span className="truncate">{t.name}</span>
                     </button>
                   );
                 })}
@@ -253,31 +254,30 @@ export default function FilterPanel({
         </div>
       </div>
 
-      {/* Status Filters */}
+      {/* Status Section */}
       <div className="px-4 pb-3">
-        <p className="text-[11px] text-gray-400 uppercase tracking-wider mb-2 font-medium">Status</p>
-        <div className="flex flex-col gap-1.5">
+        <span className="text-[12px] font-semibold text-slate-200 block mb-2">Status</span>
+        <div className="space-y-1.5">
+          {/* On-Time Chip */}
           <button
             onClick={() => toggleStatus('on_time')}
-            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm transition-all ${
+            className={`w-full flex items-center gap-2.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-all border cursor-pointer ${
               filters.statuses.has('on_time')
-                ? 'bg-emerald-500/15 text-emerald-400'
-                : 'text-gray-500 hover:text-gray-300'
+                ? 'border-cyan-500/40 bg-cyan-950/40 text-cyan-200 shadow-[0_0_12px_rgba(34,211,238,0.15)]'
+                : 'border-transparent text-slate-500 hover:text-slate-300'
             }`}
-            aria-pressed={filters.statuses.has('on_time')}
           >
-            <span
-              className="w-2 h-2 rounded-full"
-              style={{ backgroundColor: STATUS_COLORS.on_time.hex }}
-            />
-            On-Time
+            <span className="relative flex h-2 w-2">
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-cyan-400 shadow-[0_0_6px_#22d3ee]" />
+            </span>
+            <span>On-Time</span>
           </button>
+
+          {/* Delay / Exception Chip */}
           <button
             onClick={() => {
-              // Toggle both delayed and exception together
-              const hasEither = filters.statuses.has('delayed') || filters.statuses.has('exception');
               const next = new Set(filters.statuses);
-              if (hasEither) {
+              if (isDelayedOrExceptionActive) {
                 next.delete('delayed');
                 next.delete('exception');
               } else {
@@ -286,30 +286,25 @@ export default function FilterPanel({
               }
               onFiltersChange({ ...filters, statuses: next });
             }}
-            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm transition-all ${
-              filters.statuses.has('delayed') || filters.statuses.has('exception')
-                ? 'bg-red-500/15 text-red-400'
-                : 'text-gray-500 hover:text-gray-300'
+            className={`w-full flex items-center gap-2.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-all border cursor-pointer ${
+              isDelayedOrExceptionActive
+                ? 'border-red-500/40 bg-red-950/40 text-red-200 shadow-[0_0_12px_rgba(239,68,68,0.15)]'
+                : 'border-transparent text-slate-500 hover:text-slate-300'
             }`}
-            aria-pressed={filters.statuses.has('delayed') || filters.statuses.has('exception')}
           >
-            <span
-              className="w-2 h-2 rounded-full"
-              style={{ backgroundColor: STATUS_COLORS.delayed.hex }}
-            />
-            Delay / Exception
+            <span className="relative flex h-2 w-2">
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-red-400 shadow-[0_0_6px_#ef4444]" />
+            </span>
+            <span>Delay / Exception</span>
           </button>
         </div>
       </div>
 
-      {/* Count */}
-      <div className="px-4 py-2.5 border-t border-white/5">
-        <p className="text-[11px] text-gray-400">
-          Showing <span className="text-white font-semibold">{filteredCount}</span> of{' '}
-          <span className="text-gray-300">{totalCount}</span> shipments
-        </p>
+      {/* Shipment Counter */}
+      <div className="px-4 py-2 border-t border-white/5 text-[11px] text-slate-400">
+        Showing <span className="text-white font-medium">{filteredCount}</span> of{' '}
+        <span className="text-slate-300">{totalCount}</span> shipments
       </div>
     </div>
   );
 }
-

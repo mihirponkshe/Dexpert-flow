@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@deck.gl/core": "^9.4.1",
@@ -16,12 +18,14 @@
     "@tanstack/react-query": "^5.66.0",
     "@turf/turf": "^7.2.0",
     "framer-motion": "^11.18.2",
+    "globe.gl": "^2.46.2",
     "lucide-react": "^0.473.0",
     "maplibre-gl": "^4.7.1",
     "next": "16.4.5",
     "react": "19.3.0",
     "react-dom": "19.3.0",
-    "react-map-gl": "^7.1.9"
+    "react-map-gl": "^7.1.9",
+    "three": "^0.187.0"
   },
   "devDependencies": {
     "@tailwindcss/turbopack": "^4",

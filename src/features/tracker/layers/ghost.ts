@@ -1,8 +1,8 @@
 /**
  * Dexpert Flow — Ghost position indicator layers
  *
- * ScatterplotLayer for estimated current positions of shipments.
- * Medium-specific colours with glow effect.
+ * Smaller, cleaner ghost dots — subtle indicators that don't overwhelm the map.
+ * Colored by medium with soft glow.
  */
 
 import { ScatterplotLayer } from '@deck.gl/layers';
@@ -45,23 +45,41 @@ export function createGhostLayers(
   }
   if (ghostData.length === 0) return [];
 
-  const glowLayer = new ScatterplotLayer<GhostData>({
-    id: 'ghost-glow',
+  // Outer glow — subtle halo
+  const outerGlow = new ScatterplotLayer<GhostData>({
+    id: 'ghost-outer-glow',
     data: ghostData,
     getPosition: (d) => d.position,
     getFillColor: (d) => {
       const rgb = getMediumColor(d.medium);
-      const a = selectedId && selectedId !== d.shipmentId ? 20 : 80;
+      const a = selectedId && selectedId !== d.shipmentId ? 8 : 35;
       return [...rgb, a] as [number, number, number, number];
     },
-    getRadius: 18,
+    getRadius: 14,
     radiusUnits: 'pixels' as const,
     pickable: false,
     updateTriggers: { getPosition: [ghostPositions], getFillColor: [selectedId] },
   });
 
-  const mainLayer = new ScatterplotLayer<GhostData>({
-    id: 'ghost-main',
+  // Inner glow
+  const innerGlow = new ScatterplotLayer<GhostData>({
+    id: 'ghost-inner-glow',
+    data: ghostData,
+    getPosition: (d) => d.position,
+    getFillColor: (d) => {
+      const rgb = getMediumColor(d.medium);
+      const a = selectedId && selectedId !== d.shipmentId ? 18 : 80;
+      return [...rgb, a] as [number, number, number, number];
+    },
+    getRadius: 8,
+    radiusUnits: 'pixels' as const,
+    pickable: false,
+    updateTriggers: { getPosition: [ghostPositions], getFillColor: [selectedId] },
+  });
+
+  // Core dot — small and bright
+  const core = new ScatterplotLayer<GhostData>({
+    id: 'ghost-core',
     data: ghostData,
     getPosition: (d) => d.position,
     getFillColor: (d) => {
@@ -69,20 +87,19 @@ export function createGhostLayers(
       const a = selectedId && selectedId !== d.shipmentId ? DIM_OPACITY * 255 : 255;
       return [...rgb, a] as [number, number, number, number];
     },
-    getRadius: 7,
+    getRadius: 4,
     radiusUnits: 'pixels' as const,
-    radiusMinPixels: 5,
-    radiusMaxPixels: 10,
+    radiusMinPixels: 3,
+    radiusMaxPixels: 7,
     pickable: true,
     autoHighlight: true,
     highlightColor: [255, 255, 255, 120],
     stroked: true,
-    getLineColor: [255, 255, 255, 180],
-    getLineWidth: 2,
+    getLineColor: [255, 255, 255, 200],
+    getLineWidth: 1.5,
     lineWidthUnits: 'pixels' as const,
     updateTriggers: { getPosition: [ghostPositions], getFillColor: [selectedId] },
   });
 
-  return [glowLayer, mainLayer];
+  return [outerGlow, innerGlow, core];
 }
-

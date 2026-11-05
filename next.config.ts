@@ -1,11 +1,11 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  cacheComponents: true,
-  partialPrefetching: true,
-
-  // deck.gl and luma.gl are ESM-only — tell Next.js to transpile them
+  // deck.gl and globe.gl are ESM-only — tell Next.js to transpile them
   transpilePackages: [
+    'globe.gl',
+    'three-globe',
+    'three',
     '@deck.gl/core',
     '@deck.gl/layers',
     '@deck.gl/geo-layers',

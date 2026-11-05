@@ -2,6 +2,7 @@
  * Dexpert Flow — Last-known beacon layer
  *
  * Pulsing neon ring at the lastKnown position of the selected/hovered shipment.
+ * Creates a radar-sweep effect matching the reference design.
  */
 
 import { ScatterplotLayer } from '@deck.gl/layers';
@@ -35,9 +36,10 @@ export function createBeaconLayers(
   if (beaconData.length === 0) return [];
 
   const pulse = (Math.sin((animationTime / BEACON_PULSE_PERIOD) * Math.PI * 2) + 1) / 2;
-  const pulseRadius = 10 + pulse * (BEACON_MAX_RADIUS - 10);
-  const pulseAlpha = Math.round(180 - pulse * 140);
+  const pulseRadius = 12 + pulse * (BEACON_MAX_RADIUS - 12);
+  const pulseAlpha = Math.round(200 - pulse * 160);
 
+  // Inner solid ring
   const innerRing = new ScatterplotLayer<BeaconData>({
     id: 'beacon-inner',
     data: beaconData,
@@ -45,18 +47,19 @@ export function createBeaconLayers(
     getFillColor: [0, 0, 0, 0],
     getLineColor: (d) => {
       const rgb = MEDIUM_COLORS[d.medium].primary;
-      return [...rgb, 200] as [number, number, number, number];
+      return [...rgb, 220] as [number, number, number, number];
     },
-    getRadius: 8,
+    getRadius: 10,
     radiusUnits: 'pixels' as const,
     stroked: true,
     filled: false,
-    getLineWidth: 2,
+    getLineWidth: 2.5,
     lineWidthUnits: 'pixels' as const,
     pickable: false,
     updateTriggers: { getPosition: [selectedId, hoveredId] },
   });
 
+  // Outer pulsing ring
   const outerRing = new ScatterplotLayer<BeaconData>({
     id: 'beacon-pulse',
     data: beaconData,
@@ -80,6 +83,25 @@ export function createBeaconLayers(
     },
   });
 
-  return [outerRing, innerRing];
-}
+  // Soft halo glow behind everything
+  const halo = new ScatterplotLayer<BeaconData>({
+    id: 'beacon-halo',
+    data: beaconData,
+    getPosition: (d) => d.position,
+    getFillColor: (d) => {
+      const rgb = MEDIUM_COLORS[d.medium].primary;
+      return [...rgb, 25] as [number, number, number, number];
+    },
+    getRadius: pulseRadius + 8,
+    radiusUnits: 'pixels' as const,
+    stroked: false,
+    filled: true,
+    pickable: false,
+    updateTriggers: {
+      getPosition: [selectedId, hoveredId],
+      getRadius: [animationTime],
+    },
+  });
 
+  return [halo, outerRing, innerRing];
+}

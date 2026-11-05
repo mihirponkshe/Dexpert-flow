@@ -1,99 +1,100 @@
 /**
- * Dexpert Flow — Mini Globe (overview inset)
+ * Dexpert Flow — Mini Globe
  *
- * Small circular synced globe in the bottom-right corner.
+ * Glass sphere in the bottom-right corner with a thin cyan rim mirroring
+ * the main globe, with simplified dots and click-to-recenter.
  */
 
 'use client';
 
-import React, { useMemo, useCallback, useRef } from 'react';
-import Map from 'react-map-gl/maplibre';
-import { ScatterplotLayer } from '@deck.gl/layers';
-import { MapboxOverlay } from '@deck.gl/mapbox';
-import { useControl } from 'react-map-gl/maplibre';
-import type { LayersList } from '@deck.gl/core';
-import type { MapRef } from 'react-map-gl/maplibre';
-import 'maplibre-gl/dist/maplibre-gl.css';
-
+import React, { useEffect, useRef } from 'react';
 import { Shipment } from '../types';
-import { MAP_STYLE_URL, MEDIUM_COLORS } from '../constants';
-
-function MiniDeckOverlay(props: { layers: LayersList }) {
-  const overlay = useControl(() => new MapboxOverlay({ interleaved: false }));
-  overlay.setProps({ layers: props.layers });
-  return null;
-}
 
 interface MiniGlobeProps {
   shipments: Shipment[];
-  mainLng: number;
-  mainLat: number;
-  onRecenter: (lng: number, lat: number) => void;
+  mainLng?: number;
+  mainLat?: number;
+  onRecenter: () => void;
 }
 
-export default function MiniGlobe({ shipments, mainLng, mainLat, onRecenter }: MiniGlobeProps) {
-  const miniMapRef = useRef<MapRef>(null);
+export default function MiniGlobe({ shipments, onRecenter }: MiniGlobeProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const globeInstanceRef = useRef<any>(null);
 
-  const dotData = useMemo(() => {
-    const dots: { position: [number, number]; color: [number, number, number, number] }[] = [];
-    for (const s of shipments) {
-      const c = MEDIUM_COLORS[s.medium].primary;
-      dots.push({ position: [s.origin.lng, s.origin.lat], color: [...c, 180] });
-      dots.push({ position: [s.destination.lng, s.destination.lat], color: [...c, 180] });
-    }
-    return dots;
+  useEffect(() => {
+    if (!containerRef.current) return;
+
+    let isMounted = true;
+    let miniGlobe: any = null;
+
+    import('globe.gl').then((GlobeModule) => {
+      if (!isMounted || !containerRef.current) return;
+
+      const Globe = GlobeModule.default;
+      miniGlobe = new Globe(containerRef.current);
+      globeInstanceRef.current = miniGlobe;
+
+      miniGlobe
+        .width(160)
+        .height(160)
+        .backgroundColor('rgba(0,0,0,0)')
+        .globeImageUrl('//unpkg.com/three-globe/example/img/earth-night.jpg')
+        .showAtmosphere(true)
+        .atmosphereColor('#22d3ee')
+        .atmosphereAltitude(0.18);
+
+      // Disable orbit controls for mini-globe
+      const controls = miniGlobe.controls();
+      if (controls) {
+        controls.autoRotate = true;
+        controls.autoRotateSpeed = 0.8;
+        controls.enableZoom = false;
+        controls.enablePan = false;
+        controls.enableRotate = false;
+      }
+
+      // Simplified points for shipments
+      const points = shipments.flatMap((s) => [
+        { lat: s.origin.lat, lng: s.origin.lng, color: s.status === 'on_time' ? '#10b981' : '#ef4444' },
+        { lat: s.destination.lat, lng: s.destination.lng, color: '#22d3ee' },
+      ]);
+
+      miniGlobe
+        .pointsData(points)
+        .pointLat((p: any) => p.lat)
+        .pointLng((p: any) => p.lng)
+        .pointColor((p: any) => p.color)
+        .pointRadius(0.5)
+        .pointAltitude(0.02);
+    });
+
+    return () => {
+      isMounted = false;
+      if (globeInstanceRef.current) {
+        globeInstanceRef.current._destructor?.();
+        globeInstanceRef.current = null;
+      }
+    };
   }, [shipments]);
-
-  const layers: LayersList = useMemo(
-    () => [
-      new ScatterplotLayer({
-        id: 'mini-dots',
-        data: dotData,
-        getPosition: (d: (typeof dotData)[0]) => d.position,
-        getFillColor: (d: (typeof dotData)[0]) => d.color,
-        getRadius: 3,
-        radiusUnits: 'pixels' as const,
-        radiusMinPixels: 2,
-        pickable: false,
-      }),
-    ],
-    [dotData]
-  );
-
-  const handleLoad = useCallback(() => {
-    const map = miniMapRef.current?.getMap();
-    if (map) {
-      // setProjection exists on maplibre-gl v4+ but react-map-gl types lag behind
-      (map as unknown as { setProjection: (p: { type: string }) => void }).setProjection({ type: 'globe' });
-    }
-  }, []);
 
   return (
     <div
-      className="fixed bottom-6 right-6 z-40 w-32 h-32 rounded-full overflow-hidden border-2 border-white/10 shadow-2xl cursor-pointer hover:border-white/25 transition-colors hidden md:block"
-      onClick={() => onRecenter(mainLng, mainLat)}
-      role="button"
-      aria-label="Re-centre main map"
-      tabIndex={0}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') onRecenter(mainLng, mainLat);
-      }}
+      onClick={onRecenter}
+      title="Click to recenter global view"
+      className="fixed bottom-6 right-6 z-50 w-40 h-40 rounded-full border-2 border-cyan-400/40 bg-slate-950/40 backdrop-blur-md shadow-[0_0_30px_rgba(34,211,238,0.25)] flex items-center justify-center cursor-pointer transition-transform hover:scale-105 active:scale-95 group overflow-hidden"
     >
-      <Map
-        ref={miniMapRef}
-        longitude={mainLng}
-        latitude={mainLat}
-        zoom={0.5}
-        pitch={0}
-        bearing={0}
-        mapStyle={MAP_STYLE_URL}
-        style={{ width: '100%', height: '100%' }}
-        interactive={false}
-        attributionControl={false}
-        onLoad={handleLoad}
-      >
-        <MiniDeckOverlay layers={layers} />
-      </Map>
+      {/* Outer Cyan Rim Aura */}
+      <div className="absolute inset-0 rounded-full border border-cyan-300/30 shadow-[inset_0_0_20px_rgba(34,211,238,0.3)] pointer-events-none" />
+
+      {/* Mini Globe Container */}
+      <div ref={containerRef} className="w-full h-full pointer-events-none" />
+
+      {/* Recenter badge on hover */}
+      <div className="absolute inset-x-0 bottom-2 text-center opacity-0 group-hover:opacity-100 transition-opacity">
+        <span className="text-[10px] font-medium text-cyan-300 bg-slate-900/80 px-2 py-0.5 rounded-full border border-cyan-500/30">
+          Recenter
+        </span>
+      </div>
     </div>
   );
 }

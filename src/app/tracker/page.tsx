@@ -1,8 +1,8 @@
 /**
  * Dexpert Flow — Tracker Page
  *
- * Main page that wires together the TrackerMap, FilterPanel, ShipmentPanel,
- * MiniGlobe, and data hooks. All data flows through this page.
+ * Main page wiring together TrackerGlobe, FilterPanel, ShipmentPanel,
+ * RadarWidget, MiniGlobe, GlobalSearch, and TanStack Query data hooks.
  */
 
 'use client';
@@ -17,12 +17,14 @@ import { useRefreshShipment } from '@/features/tracker/hooks/useRefreshShipment'
 import { getTenantsFromShipments } from '@/features/tracker/data/shipments.mock';
 import FilterPanel from '@/features/tracker/components/FilterPanel';
 import ShipmentPanel from '@/features/tracker/components/ShipmentPanel';
+import RadarWidget from '@/features/tracker/components/RadarWidget';
+import GlobalSearch from '@/features/tracker/components/GlobalSearch';
 import type { GhostPosition } from '@/features/tracker/hooks/useGhostPosition';
 
-/* ── Dynamic imports for client-only map components ─────────── */
-const TrackerMap = dynamic(
-  () => import('@/features/tracker/components/TrackerMap'),
-  { ssr: false, loading: () => <MapLoadingFallback /> }
+/* ── Dynamic imports for client-only 3D Globe components ─────── */
+const TrackerGlobe = dynamic(
+  () => import('@/features/tracker/components/TrackerGlobe'),
+  { ssr: false, loading: () => <GlobeLoadingFallback /> }
 );
 
 const MiniGlobe = dynamic(
@@ -30,12 +32,12 @@ const MiniGlobe = dynamic(
   { ssr: false }
 );
 
-function MapLoadingFallback() {
+function GlobeLoadingFallback() {
   return (
-    <div className="flex items-center justify-center h-full bg-gray-950 text-white">
+    <div className="flex items-center justify-center h-full bg-[#070b17] text-white">
       <div className="text-center">
-        <div className="inline-block w-8 h-8 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin mb-4" />
-        <p className="text-gray-400 text-sm">Loading 3D Globe…</p>
+        <div className="inline-block w-10 h-10 border-3 border-cyan-400 border-t-transparent rounded-full animate-spin mb-4 shadow-[0_0_20px_#22d3ee]" />
+        <p className="text-cyan-300 text-sm tracking-wide font-medium">Initializing 3D Globe Environment…</p>
       </div>
     </div>
   );
@@ -52,7 +54,7 @@ function applyFilters(shipments: Shipment[], filters: TrackerFilters): Shipment[
   });
 }
 
-/* ── Inner component (requires QueryClient context) ─────────── */
+/* ── Inner component ────────────────────────────────────────── */
 function TrackerPageInner() {
   const { data: shipments = [], isLoading, error } = useShipments();
   const refreshMutation = useRefreshShipment();
@@ -88,7 +90,7 @@ function TrackerPageInner() {
     [shipments, filters]
   );
 
-  /* ── Update selected shipment when data changes ───────────── */
+  /* ── Keep selected shipment in sync with data updates ─────── */
   React.useEffect(() => {
     if (selectedShipment) {
       const updated = shipments.find((s) => s.id === selectedShipment.id);
@@ -104,10 +106,12 @@ function TrackerPageInner() {
   }, []);
 
   const handleRefresh = useCallback(
-    async (id: string): Promise<Shipment> => {
-      return refreshMutation.mutateAsync(id);
+    async (id?: string): Promise<Shipment> => {
+      const targetId = id || selectedShipment?.id || filteredShipments[0]?.id;
+      if (!targetId) throw new Error('No shipment to refresh');
+      return refreshMutation.mutateAsync(targetId);
     },
-    [refreshMutation]
+    [refreshMutation, selectedShipment, filteredShipments]
   );
 
   const handleGhostPositionsUpdate = useCallback((ghosts: Map<string, GhostPosition>) => {
@@ -118,26 +122,26 @@ function TrackerPageInner() {
     ? ghostPositionsRef.current.get(selectedShipment.id)
     : null;
 
-  /* ── Loading / Error states ───────────────────────────────── */
+  /* ── Error state ──────────────────────────────────────────── */
   if (error) {
     return (
-      <div className="flex items-center justify-center h-screen bg-gray-950 text-white">
-        <div className="text-center p-8">
-          <h2 className="text-xl font-semibold mb-2 text-red-400">Error Loading Data</h2>
-          <p className="text-gray-400">{(error as Error).message}</p>
+      <div className="flex items-center justify-center h-screen bg-[#070b17] text-white">
+        <div className="text-center p-8 glass-panel max-w-md">
+          <h2 className="text-xl font-bold mb-2 text-red-400">Error Loading Shipments</h2>
+          <p className="text-slate-300 text-sm">{(error as Error).message}</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="relative w-screen h-screen bg-gray-950 overflow-hidden">
-      {/* Main Map */}
-      <div className="absolute inset-0">
+    <div className="relative w-screen h-screen bg-[#070b17] overflow-hidden select-none">
+      {/* Main 3D Globe */}
+      <div className="absolute inset-0 z-0">
         {isLoading ? (
-          <MapLoadingFallback />
+          <GlobeLoadingFallback />
         ) : (
-          <TrackerMap
+          <TrackerGlobe
             shipments={filteredShipments}
             onRefresh={handleRefresh}
             onSelect={handleSelect}
@@ -149,6 +153,17 @@ function TrackerPageInner() {
         )}
       </div>
 
+      {/* Atmospheric depth vignette */}
+      <div className="globe-atmosphere" />
+
+      {/* ── Top bar: Global Search (top-center) ──────────────── */}
+      <div className="fixed top-5 left-1/2 -translate-x-1/2 z-50">
+        <GlobalSearch
+          shipments={shipments}
+          onSelectShipment={handleSelect}
+        />
+      </div>
+
       {/* Filter Panel (top-left) */}
       <FilterPanel
         filters={filters}
@@ -158,7 +173,16 @@ function TrackerPageInner() {
         filteredCount={filteredShipments.length}
       />
 
-      {/* Shipment Detail Panel (right side or bottom sheet) */}
+      {/* Radar / Live Status Card */}
+      <div className="fixed top-1/2 -translate-y-8 left-[300px] z-40 hidden lg:block">
+        <RadarWidget
+          selectedShipment={selectedShipment}
+          onRefreshLive={handleRefresh}
+          isRefreshing={refreshMutation.isPending}
+        />
+      </div>
+
+      {/* Shipment Detail Panel (right side) */}
       {selectedShipment && (
         <ShipmentPanel
           shipment={selectedShipment}
@@ -166,52 +190,56 @@ function TrackerPageInner() {
           onRefresh={handleRefresh}
           isRefreshing={refreshMutation.isPending}
           refreshError={refreshMutation.error}
-          ghostPosition={selectedGhost ? { lng: selectedGhost.lng, lat: selectedGhost.lat, fraction: selectedGhost.fraction } : null}
+          ghostPosition={
+            selectedGhost
+              ? { lng: selectedGhost.lng, lat: selectedGhost.lat, fraction: selectedGhost.fraction }
+              : null
+          }
         />
       )}
 
-      {/* Mini Globe (bottom-right, hidden on mobile) */}
+      {/* Mini Globe (bottom-right) */}
       {!isLoading && (
         <MiniGlobe
           shipments={filteredShipments}
-          mainLng={30}
-          mainLat={20}
           onRecenter={() => {
-            // Re-centre handled by main map view state
+            handleSelect(null);
           }}
         />
       )}
 
       {/* Legend (bottom-left) */}
-      <div className="fixed bottom-6 left-4 z-40 hidden md:block">
-        <div className="px-3 py-2.5 rounded-xl bg-gray-900/80 backdrop-blur-xl border border-white/10 text-[10px] text-gray-400 space-y-1.5">
-          <div className="flex items-center gap-2">
-            <span className="w-5 h-0.5 rounded" style={{ backgroundColor: '#22d3ee' }} />
-            <span>Air</span>
+      <div className="fixed bottom-6 left-6 z-50">
+        <div className="glass-panel px-4 py-3 text-[11px] text-slate-300 space-y-2 shadow-2xl">
+          <div className="flex items-center gap-2.5">
+            <span className="w-5 h-0.5 rounded shadow-[0_0_6px_#22d3ee]" style={{ backgroundColor: '#22d3ee' }} />
+            <span className="font-medium text-slate-200">Air</span>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="w-5 h-0.5 rounded" style={{ backgroundColor: '#14b8a6' }} />
-            <span>Sea</span>
+          <div className="flex items-center gap-2.5">
+            <span className="w-5 h-0.5 rounded shadow-[0_0_6px_#14b8a6]" style={{ backgroundColor: '#14b8a6' }} />
+            <span className="font-medium text-slate-200">Sea</span>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="w-5 h-0.5 rounded" style={{ backgroundColor: '#f59e0b' }} />
-            <span>Road</span>
+          <div className="flex items-center gap-2.5">
+            <span className="w-5 h-0.5 rounded shadow-[0_0_6px_#f59e0b]" style={{ backgroundColor: '#f59e0b' }} />
+            <span className="font-medium text-slate-200">Road</span>
           </div>
-          <div className="border-t border-white/5 pt-1.5 mt-1.5 flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full" style={{ backgroundColor: '#10b981' }} />
-            <span>On-Time</span>
+          <div className="border-t border-white/10 pt-2 flex items-center gap-2.5">
+            <span className="w-2 h-2 rounded-full shadow-[0_0_6px_#10b981]" style={{ backgroundColor: '#10b981' }} />
+            <span className="font-medium text-slate-200">On-Time</span>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full" style={{ backgroundColor: '#ef4444' }} />
-            <span>Delayed / Exception</span>
+          <div className="flex items-center gap-2.5">
+            <span className="w-2 h-2 rounded-full shadow-[0_0_6px_#ef4444]" style={{ backgroundColor: '#ef4444' }} />
+            <span className="font-medium text-slate-200">Delay / Exception</span>
+          </div>
+          <div className="flex items-center gap-2.5">
+            <span className="w-5 h-0.5 rounded shadow-[0_0_6px_#ef4444]" style={{ backgroundColor: '#ef4444' }} />
+            <span className="font-medium text-slate-200">Delayed Route</span>
           </div>
         </div>
       </div>
 
-      {/* Toast for refresh success */}
-      {refreshMutation.isSuccess && (
-        <Toast message="Live status updated" />
-      )}
+      {/* Toast notification on refresh */}
+      {refreshMutation.isSuccess && <Toast message="Live tracking status updated" />}
     </div>
   );
 }
@@ -228,13 +256,13 @@ function Toast({ message }: { message: string }) {
   if (!visible) return null;
 
   return (
-    <div className="fixed top-4 right-4 z-[100] px-4 py-2.5 rounded-xl bg-emerald-500/90 backdrop-blur text-white text-sm font-medium shadow-lg animate-in slide-in-from-top-2 fade-in">
+    <div className="fixed top-5 right-5 z-[100] px-4 py-2.5 rounded-xl bg-cyan-500/90 backdrop-blur-md text-white text-xs font-semibold shadow-[0_0_25px_rgba(34,211,238,0.5)] border border-cyan-300/40">
       ✓ {message}
     </div>
   );
 }
 
-/* ── Page with QueryClient Provider ─────────────────────────── */
+/* ── QueryClient Provider ───────────────────────────────────── */
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -251,4 +279,3 @@ export default function TrackerPage() {
     </QueryClientProvider>
   );
 }
-

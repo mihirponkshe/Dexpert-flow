@@ -1,7 +1,8 @@
 /**
  * Dexpert Flow — Origin/Destination pin layers
  *
- * ScatterplotLayer for origin and destination points, coloured by status.
+ * Dramatic triple-layer neon pins with strong glow.
+ * Larger and brighter to match reference design.
  */
 
 import { ScatterplotLayer } from '@deck.gl/layers';
@@ -45,23 +46,41 @@ export function createPinLayers(
   const pins = extractPins(shipments);
   if (pins.length === 0) return [];
 
-  const glowLayer = new ScatterplotLayer<PinData>({
-    id: 'pins-glow',
+  // Outer glow — large and soft
+  const outerGlow = new ScatterplotLayer<PinData>({
+    id: 'pins-outer-glow',
     data: pins,
     getPosition: (d) => d.position,
     getFillColor: (d) => {
       const rgb = getStatusColor(d.status);
-      const a = selectedId && selectedId !== d.shipmentId ? DIM_OPACITY * 60 : 60;
+      const a = selectedId && selectedId !== d.shipmentId ? 12 : 50;
       return [...rgb, a] as [number, number, number, number];
     },
-    getRadius: 12,
+    getRadius: 24,
     radiusUnits: 'pixels' as const,
     pickable: false,
     updateTriggers: { getFillColor: [selectedId] },
   });
 
-  const mainLayer = new ScatterplotLayer<PinData>({
-    id: 'pins-main',
+  // Inner glow
+  const innerGlow = new ScatterplotLayer<PinData>({
+    id: 'pins-inner-glow',
+    data: pins,
+    getPosition: (d) => d.position,
+    getFillColor: (d) => {
+      const rgb = getStatusColor(d.status);
+      const a = selectedId && selectedId !== d.shipmentId ? 30 : 120;
+      return [...rgb, a] as [number, number, number, number];
+    },
+    getRadius: 13,
+    radiusUnits: 'pixels' as const,
+    pickable: false,
+    updateTriggers: { getFillColor: [selectedId] },
+  });
+
+  // Core pin — bright
+  const core = new ScatterplotLayer<PinData>({
+    id: 'pins-core',
     data: pins,
     getPosition: (d) => d.position,
     getFillColor: (d) => {
@@ -69,20 +88,19 @@ export function createPinLayers(
       const a = selectedId && selectedId !== d.shipmentId ? DIM_OPACITY * 255 : 255;
       return [...rgb, a] as [number, number, number, number];
     },
-    getRadius: 5,
+    getRadius: 6,
     radiusUnits: 'pixels' as const,
-    radiusMinPixels: 3,
-    radiusMaxPixels: 8,
+    radiusMinPixels: 4,
+    radiusMaxPixels: 9,
     pickable: true,
     autoHighlight: true,
-    highlightColor: [255, 255, 255, 100],
+    highlightColor: [255, 255, 255, 120],
     stroked: true,
-    getLineColor: [255, 255, 255, 120],
-    getLineWidth: 1,
+    getLineColor: [255, 255, 255, 180],
+    getLineWidth: 1.5,
     lineWidthUnits: 'pixels' as const,
     updateTriggers: { getFillColor: [selectedId] },
   });
 
-  return [glowLayer, mainLayer];
+  return [outerGlow, innerGlow, core];
 }
-

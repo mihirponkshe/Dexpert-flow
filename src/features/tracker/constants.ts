@@ -52,11 +52,11 @@ export const AUTO_ROTATE_IDLE_MS = 5000;
 
 // ─── Map defaults ─────────────────────────────────────────────────
 export const DEFAULT_VIEW_STATE = {
-  longitude: 30,
+  longitude: 45,
   latitude: 20,
-  zoom: 1.5,
-  pitch: 30,
-  bearing: 0,
+  zoom: 2.2,
+  pitch: 35,
+  bearing: -15,
 };
 
 /** MapLibre style URL — override with NEXT_PUBLIC_MAP_STYLE_URL env var */
